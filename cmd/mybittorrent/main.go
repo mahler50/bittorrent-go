@@ -108,6 +108,8 @@ func decodeList(s string, st int) (l []any, i int, err error) {
 
 		l = append(l, x)
 	}
+	// skip 'e'
+	i++
 
 	return l, i, nil
 }
