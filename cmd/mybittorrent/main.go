@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"unicode"
@@ -119,6 +120,13 @@ func decodeList(s string, st int) (l []any, i int, err error) {
 // decode dictionaries d<key1><value1>...<keyN><valueN>e
 // key must be bencoded string and value could be any bencoded element
 func decodeDictionaries(s string, st int) (dict map[string]any, i int, err error) {
+	if st == len(s) {
+		return nil, st, io.ErrUnexpectedEOF
+	}
+
+	if s[st] != 'd' {
+		return nil, st, fmt.Errorf("dictionaries expected")
+	}
 	i = st
 	// skip 'd'
 	i++
@@ -154,26 +162,45 @@ func decodeDictionaries(s string, st int) (dict map[string]any, i int, err error
 	return dict, i, nil
 }
 
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	//fmt.Println("Logs from your program will appear here!")
+// print metainfo map
+func printMetaInfo(dict map[string]any) {
+	fmt.Printf("Tracker URL: %v\n", dict["announce"])
 
+	info, ok := dict["info"].(map[string]any)
+	if info == nil || !ok {
+		log.Fatalf("No info section")
+	}
+
+	fmt.Printf("Length: %v\n", info["length"])
+}
+
+func main() {
 	command := os.Args[1]
 
-	if command == "decode" {
+	switch command {
+	case "decode":
 		decoded, idx, err := decode(os.Args[2], 0)
 		if err != nil {
-			fmt.Printf("error: %v at %d\n", err, idx)
-			return
+			log.Fatalf("error: %v at %d\n", err, idx)
 		}
 
 		jsonOutput, err := json.Marshal(decoded)
 		if err != nil {
-			fmt.Printf("error: encode to json%v\n", err)
-			os.Exit(1)
+			log.Fatalf("error: encode to json%v\n", err)
 		}
 		fmt.Println(string(jsonOutput))
-	} else {
+	case "info":
+		bytes, err := os.ReadFile(os.Args[2])
+		if err != nil {
+			log.Fatalf("error: read file %v\n", err)
+		}
+
+		dict, idx, err := decodeDictionaries(string(bytes), 0)
+		if err != nil {
+			log.Fatalf("error: %v at %d\n", err, idx)
+		}
+		printMetaInfo(dict)
+	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
 	}
