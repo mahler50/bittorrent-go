@@ -29,13 +29,15 @@ func decode(s string, st int) (x any, i int, err error) {
 		return decodeInt(s, i)
 	case unicode.IsDigit(rune(s[i])):
 		return decodeString(s, i)
+	case s[i] == 'd':
+		return decodeDictionaries(s, i)
 	default:
 		return nil, st, fmt.Errorf("unexpected err at: %q", s[i])
 	}
 }
 
 // decode string <length>:<string>
-func decodeString(s string, st int) (x any, i int, err error) {
+func decodeString(s string, st int) (x string, i int, err error) {
 	var firstColonIndex int
 	i = st
 
@@ -63,7 +65,7 @@ func decodeString(s string, st int) (x any, i int, err error) {
 }
 
 // decode integer i<integer>e
-func decodeInt(s string, st int) (x any, i int, err error) {
+func decodeInt(s string, st int) (x int, i int, err error) {
 	i = st
 	// skip 'i'
 	i++
@@ -103,7 +105,7 @@ func decodeList(s string, st int) (l []any, i int, err error) {
 		var x any
 		x, i, err = decode(s, i)
 		if err != nil {
-			return nil, st, err
+			return nil, i, err
 		}
 
 		l = append(l, x)
@@ -112,6 +114,44 @@ func decodeList(s string, st int) (l []any, i int, err error) {
 	i++
 
 	return l, i, nil
+}
+
+// decode dictionaries d<key1><value1>...<keyN><valueN>e
+// key must be bencoded string and value could be any bencoded element
+func decodeDictionaries(s string, st int) (dict map[string]any, i int, err error) {
+	i = st
+	// skip 'd'
+	i++
+
+	dict = map[string]any{}
+
+	for {
+		if i >= len(s) {
+			return nil, st, fmt.Errorf("bad dictionaries")
+		}
+
+		if s[i] == 'e' {
+			break
+		}
+
+		var key string
+		key, i, err = decodeString(s, i)
+		if err != nil {
+			return nil, i, err
+		}
+
+		var value any
+		value, i, err = decode(s, i)
+		if err != nil {
+			return nil, i, err
+		}
+
+		dict[key] = value
+	}
+	// skip 'e'
+	i++
+
+	return dict, i, nil
 }
 
 func main() {
